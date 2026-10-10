@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>بازی الفبای فارسی</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Vazirmatn:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* palette */
+    --ink: #2b2552;
+    --muted: #6a678f;
+    --violet: #7b5cff;   --violet-edge: #5a3fd6;
+    --sun: #ffc83d;      --sun-edge: #e0a000;   --sun-ink: #4a3000;
+    --ok: #13ad7f;       --ok-edge: #0b8a64;    --ok-ink: #0a7a58;
+    --bad: #f2475d;      --bad-edge: #c92c43;   --bad-ink: #c4263c;
+    --glass: rgba(255, 255, 255, .62);
+    --glass-line: rgba(255, 255, 255, .9);
+    --glass-shadow: 0 12px 32px rgba(94, 70, 170, .16);
+    /* playful tile colours: soft fill + darker bottom edge */
+    --c0-soft: #ffe0ec; --c0-edge: #f08cb1;
+    --c1-soft: #ffefc9; --c1-edge: #f0b94a;
+    --c2-soft: #d3f6e8; --c2-edge: #5fcfa6;
+    --c3-soft: #d8ebff; --c3-edge: #6fb0f0;
+    --c4-soft: #e6dfff; --c4-edge: #a58cf5;
+    --c5-soft: #ffe1d3; --c5-edge: #f59a73;
+    --display: "Lalezar", "Vazirmatn", Tahoma, system-ui, sans-serif;
+    --radius: 22px;
+    --gap: 10px;
+    /* Number of letter squares; set from JS for every level. */
+    --n: 4;
+    /* Square size: max 84px, shrinks so every square fits on narrow phones. */
+    --size: min(84px, calc((100vw - 48px - (var(--n) - 1) * var(--gap)) / var(--n)));
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  [hidden] { display: none !important; }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: linear-gradient(160deg, #ffe6f0 0%, #efe6ff 40%, #d9f0ff 72%, #dff9e8 100%) fixed;
+    color: var(--ink);
+    font-family: "Vazirmatn", Tahoma, "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    overflow-x: hidden;
+  }
+  /* soft floating colour blobs behind everything */
+  body::before {
+    content: ""; position: fixed; inset: -15%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(38vmax 38vmax at 10% 6%, rgba(255, 178, 90, .42), transparent 62%),
+      radial-gradient(44vmax 44vmax at 96% 24%, rgba(123, 92, 255, .26), transparent 62%),
+      radial-gradient(40vmax 40vmax at 14% 96%, rgba(47, 207, 157, .30), transparent 62%),
+      radial-gradient(34vmax 34vmax at 90% 92%, rgba(255, 111, 165, .24), transparent 62%);
+    animation: drift 20s ease-in-out infinite alternate;
+  }
+  @keyframes drift { from { transform: translate3d(-2%, -1%, 0) scale(1); } to { transform: translate3d(2%, 2%, 0) scale(1.08); } }
+
+  main {
+    width: 100%;
+    max-width: 520px;
+    padding: 20px 24px calc(28px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+  button:focus-visible { outline: 3px solid var(--violet); outline-offset: 3px; }
+
+  /* ---------- Views: main menu / game area ---------- */
+  #main-menu { width: 100%; display: flex; flex-direction: column; gap: 16px; padding-top: 5vh; }
+  #game-area { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+
+  .menu-title {
+    margin: 0; text-align: center;
+    font-family: var(--display); font-weight: 400;
+    font-size: 3.2rem; line-height: 1.35;
+    background: linear-gradient(100deg, #ff5f9a 0%, #7b5cff 55%, #2aa8ff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 0 rgba(255, 255, 255, .8));
+  }
+  .menu-sub { margin: -8px 0 8px; text-align: center; color: var(--muted); font-weight: 600; font-size: 1.05rem; }
+
+  .menu-card {
+    width: 100%;
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 18px;
+    border-radius: 28px;
+    background: var(--glass);
+    border: 1.5px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
+    text-align: start;
+    box-shadow: var(--glass-shadow), 0 6px 0 rgba(255, 255, 255, .5);
+    transition: transform .2s cubic-bezier(.3, 1.5, .5, 1), box-shadow .2s;
+  }
+  .menu-card:hover { transform: translateY(-4px) scale(1.025); box-shadow: 0 18px 38px rgba(94, 70, 170, .24), 0 6px 0 rgba(255, 255, 255, .5); }
+  .menu-card:active { transform: translateY(2px) scale(.98); box-shadow: 0 6px 14px rgba(94, 70, 170, .16); }
+  .menu-icon {
+    flex: none; width: 62px; height: 62px; border-radius: 20px;
+    display: grid; place-items: center;
+    color: #fff;
+    font-family: var(--display); font-size: 2.3rem; line-height: 1;
+    padding-bottom: .1em;
+    text-shadow: 0 2px 0 rgba(0, 0, 0, .12);
+    transition: transform .25s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  .menu-card:hover .menu-icon { transform: rotate(-8deg) scale(1.08); }
+  .menu-icon svg { width: 30px; height: 30px; }
+  .menu-card[data-mode="1"] .menu-icon { background: #ff6fa5; box-shadow: 0 5px 0 #d94683; }
+  .menu-card[data-mode="2"] .menu-icon { background: #1fbf8f; box-shadow: 0 5px 0 #0f9a71; }
+  .menu-card[data-mode="3"] .menu-icon { background: #4a9dff; box-shadow: 0 5px 0 #2c7ad9; }
+  .menu-text { flex: 1; display: grid; gap: 2px; }
+  .menu-text strong { font-family: var(--display); font-weight: 400; font-size: 1.55rem; line-height: 1.4; }
+  .menu-text span { font-size: .92rem; color: var(--muted); line-height: 1.7; font-weight: 600; }
+  .menu-go { flex: none; width: 24px; height: 24px; color: var(--violet); transition: transform .2s; }
+  .menu-card:hover .menu-go { transform: translateX(-5px); }   /* RTL: forward is to the left */
+
+  .back-btn {
+    align-self: flex-start;          /* RTL: sits on the right edge */
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 42px; padding: 0 16px 0 18px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--violet-edge);
+    font-size: .92rem; font-weight: 800;
+    box-shadow: 0 4px 0 #d9d0fb, 0 10px 18px rgba(94, 70, 170, .14);
+    transition: transform .15s cubic-bezier(.3, 1.5, .5, 1), box-shadow .15s;
+  }
+  .back-btn svg { width: 16px; height: 16px; }
+  .back-btn:hover { transform: translateY(-2px) scale(1.04); }
+  .back-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #d9d0fb, 0 3px 6px rgba(94, 70, 170, .14); }
+  #game-area:not([data-mode="1"]) .back-btn { margin-bottom: -4px; }
+
+  /* ---------- Level progress ---------- */
+  .progress { width: 100%; display: flex; align-items: center; gap: 12px; }
+  .level-label {
+    padding: 4px 14px; border-radius: 999px;
+    background: var(--glass); border: 1.5px solid var(--glass-line);
+    font-size: .88rem; font-weight: 800; color: var(--violet-edge); white-space: nowrap;
+  }
+  .track {
+    flex: 1; height: 14px; border-radius: 999px;
+    background: rgba(123, 92, 255, .14);
+    border: 2px solid rgba(255, 255, 255, .95);
+    box-shadow: inset 0 2px 4px rgba(94, 70, 170, .2);
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%; width: 0; border-radius: inherit;
+    background: linear-gradient(90deg, #ff6fa5, #ffb22e 55%, #2fcf9d);
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .1);
+    transition: width .8s cubic-bezier(.3, 1.3, .3, 1);
+  }
+
+  /* ---------- Picture ---------- */
+  .picture {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    width: fit-content;          /* hugs the image: no stretching, no empty bars */
+    max-width: 100%;
+    border-radius: 34px;
+    border: 6px solid #fff;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 16px 36px rgba(94, 70, 170, .24), 0 0 0 4px rgba(255, 255, 255, .45);
+  }
+  .picture img {
+    display: block;
+    width: auto; height: auto;   /* natural size, never scaled up */
+    max-width: 100%;             /* only ever scaled DOWN, keeping the aspect ratio */
+    max-height: 30dvh;
+    object-fit: contain;
+  }
+  .picture .placeholder {
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    color: var(--violet); font-size: .95rem; font-weight: 600;
+  }
+  .picture.missing { width: 100%; aspect-ratio: 16 / 10; max-height: 30dvh; background: linear-gradient(135deg, #f3edff, #e3f4ff); }
+  .picture.missing img { display: none; }
+  .picture.missing .placeholder { display: flex; }
+
+  /* ---------- Audio button (3D violet pill) ---------- */
+  .audio-btn {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 10px;
+    min-height: 56px;
+    padding: 0 28px 0 32px;
+    border-radius: 999px;
+    background: var(--violet);
+    color: #fff;
+    font-weight: 800; font-size: 1.08rem;
+    box-shadow: 0 6px 0 var(--violet-edge), 0 14px 22px rgba(90, 63, 214, .35);
+    transition: transform .15s cubic-bezier(.3, 1.5, .5, 1), box-shadow .15s;
+  }
+  .audio-btn:hover { transform: translateY(-2px) scale(1.05); }
+  .audio-btn:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--violet-edge), 0 4px 8px rgba(90, 63, 214, .35); }
+  .audio-btn svg { width: 26px; height: 26px; flex: none; }
+  .audio-btn .wave { opacity: .45; transition: opacity .2s; }
+  .audio-btn.playing::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    border: 3px solid var(--violet);
+    animation: ring 1s ease-out infinite;
+  }
+  .audio-btn.playing .wave { animation: wave 0.9s ease-in-out infinite; }
+  .audio-btn.playing .wave.w2 { animation-delay: .25s; }
+  @keyframes ring { from { transform: scale(1); opacity: .8; } to { transform: scale(1.3, 1.7); opacity: 0; } }
+  @keyframes wave { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+
+  /* ---------- Answer squares ---------- */
+  .board {
+    position: relative;
+    width: fit-content;
+    border-radius: var(--radius);
+    transition: background .5s;
+  }
+  .slots {
+    display: flex;              /* inherits dir=rtl: first square sits on the right */
+    gap: var(--gap);
+    transition: gap .6s cubic-bezier(.6, 0, .2, 1);
+  }
+  .slot {
+    width: var(--size); height: var(--size);
+    border-radius: var(--radius);
+    border: 3px dashed rgba(123, 92, 255, .4);
+    background: rgba(255, 255, 255, .5);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    display: grid; place-items: stretch;
+    transition: background .35s, border-color .35s, border-radius .6s;
+  }
+  .slot.filled {
+    border: 3px solid #fff;
+    background: #fff;
+    box-shadow: 0 6px 0 #cfc3fb, 0 12px 18px rgba(94, 70, 170, .2);
+    animation: ringPulse .6s ease-out;
+  }
+  .slot.filled.static { animation: none; }
+  @keyframes ringPulse {
+    0%   { box-shadow: 0 6px 0 #cfc3fb, 0 0 0 0 rgba(123, 92, 255, .6); }
+    100% { box-shadow: 0 6px 0 #cfc3fb, 0 0 0 18px rgba(123, 92, 255, 0); }
+  }
+
+  .tile {
+    width: 100%; height: 100%;
+    display: grid; place-items: center;
+    border-radius: var(--radius);
+    font-family: "Vazirmatn", Tahoma, system-ui, sans-serif;   /* clearest isolated letter shapes */
+    font-size: calc(var(--size) * .6);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;          /* never space Arabic-script letters */
+    padding-bottom: .1em;
+    color: var(--ink);
+    transition: transform .15s cubic-bezier(.3, 1.5, .5, 1), opacity .6s;
+  }
+  .slot .tile { animation: bounce .55s cubic-bezier(.3, 1.4, .5, 1); }
+  .slot.static .tile { animation: none; }
+  @keyframes bounce {
+    0%   { transform: scale(.3) rotate(-12deg); opacity: 0; }
+    45%  { transform: scale(1.3) rotate(5deg); opacity: 1; }
+    70%  { transform: scale(.88) rotate(-2deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  /* Wrong: coral flash, red glow, shake */
+  .board.wrong {
+    animation: shake .5s 2, redFlash 1s;
+    filter: drop-shadow(0 0 14px rgba(242, 71, 93, .85));
+  }
+  .board.wrong .slot { background: var(--bad); border-color: var(--bad); box-shadow: 0 6px 0 var(--bad-edge); animation: none; }
+  .board.wrong .tile { color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .15); animation: none; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-10px) rotate(-1.5deg); }
+    30% { transform: translateX(9px) rotate(1.5deg); }
+    45% { transform: translateX(-7px) rotate(-1deg); }
+    60% { transform: translateX(6px) rotate(1deg); }
+    75% { transform: translateX(-3px); }
+    90% { transform: translateX(2px); }
+  }
+  @keyframes redFlash {
+    0%   { filter: drop-shadow(0 0 0 rgba(242, 71, 93, 0)); }
+    20%  { filter: drop-shadow(0 0 22px rgba(242, 71, 93, 1)); }
+    100% { filter: drop-shadow(0 0 12px rgba(242, 71, 93, .6)); }
+  }
+
+  /* Correct: step 1 turn mint + glow + cheer, step 2 (.merged) squares fuse into one bar */
+  .board.ok {
+    animation: cheer .6s cubic-bezier(.3, 1.5, .5, 1);
+    filter: drop-shadow(0 0 16px rgba(19, 173, 127, .8));
+  }
+  .board.ok .slot { background: var(--ok); border-color: var(--ok); box-shadow: 0 6px 0 var(--ok-edge); animation: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .board.ok .tile { color: #fff; text-shadow: 0 2px 0 rgba(0, 70, 50, .3); animation: none; }
+  .board.ok::after {                       /* a quick cheerful flash */
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 70%);
+    animation: flash .8s ease-out forwards;
+  }
+  @keyframes cheer { 0% { transform: scale(1); } 35% { transform: scale(1.08); } 65% { transform: scale(.97); } 100% { transform: scale(1); } }
+  @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+  .board.merged { background: var(--ok); overflow: hidden; animation: glow 2s ease-in-out infinite; }
+  .board.merged .slots { gap: 0; }
+  .board.merged .slot { border-radius: 0; box-shadow: none; }
+  .board.merged .tile { opacity: 0; }
+  @keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(19, 173, 127, .6)); }
+    50%      { filter: drop-shadow(0 0 22px rgba(19, 173, 127, .95)); }
+  }
+
+  /* The connected word, shown as ONE text run so the letters join. */
+  .word {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    color: #fff;
+    font-family: var(--display);
+    font-size: calc(var(--size) * .7);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    padding-bottom: .3em;
+    text-shadow: 0 3px 0 rgba(0, 70, 50, .35);
+    opacity: 0;
+    transform: scale(.85);
+    transition: opacity .6s .15s, transform .6s .15s cubic-bezier(.3, 1.6, .5, 1);
+    pointer-events: none;
+  }
+  .board.merged .word { opacity: 1; transform: scale(1); }
+
+  /* ---------- Status line ---------- */
+  .status {
+    min-height: 2.4rem;
+    margin: -6px 0 -6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 1.05rem;
+    color: var(--muted);
+    text-align: center;
+  }
+  .status #status:empty { display: none; }
+  .status.ok #status, .status.bad #status {
+    padding: 5px 18px; border-radius: 999px;
+    animation: statusPop .5s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  .status.ok  #status { color: var(--ok-ink); background: rgba(19, 173, 127, .16); box-shadow: 0 0 0 2px rgba(19, 173, 127, .4), 0 0 16px rgba(19, 173, 127, .35); }
+  .status.bad #status { color: var(--bad-ink); background: rgba(242, 71, 93, .14); box-shadow: 0 0 0 2px rgba(242, 71, 93, .4), 0 0 16px rgba(242, 71, 93, .3); }
+  @keyframes statusPop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* ---------- Bottom area: letter pool, with the Finale layer on top of it ---------- */
+  .bottom { width: 100%; display: grid; }
+  .bottom > * { grid-area: 1 / 1; }
+
+  .pool {
+    min-height: calc(var(--size) + 14px);
+    display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start;
+    gap: 16px var(--gap);
+  }
+  .pool .tile {
+    width: var(--size); height: var(--size);
+    background: var(--soft, #fff);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 0 var(--edge, #ccc), 0 14px 18px rgba(94, 70, 170, .18);
+    transition: transform .15s cubic-bezier(.3, 1.6, .5, 1), box-shadow .15s, opacity .7s;
+  }
+  /* colour follows the letter tile (stable data-id), not its position in the pool */
+  .pool .tile[data-id="0"], .pool .tile[data-id="6"] { --soft: var(--c0-soft); --edge: var(--c0-edge); }
+  .pool .tile[data-id="1"], .pool .tile[data-id="7"] { --soft: var(--c3-soft); --edge: var(--c3-edge); }
+  .pool .tile[data-id="2"] { --soft: var(--c1-soft); --edge: var(--c1-edge); }
+  .pool .tile[data-id="3"] { --soft: var(--c2-soft); --edge: var(--c2-edge); }
+  .pool .tile[data-id="4"] { --soft: var(--c4-soft); --edge: var(--c4-edge); }
+  .pool .tile[data-id="5"] { --soft: var(--c5-soft); --edge: var(--c5-edge); }
+  .pool .tile:hover { transform: translateY(-4px) scale(1.08) rotate(-2deg); box-shadow: 0 10px 0 var(--edge), 0 20px 24px rgba(94, 70, 170, .24); }
+  .pool .tile:active { transform: translateY(5px) scale(.97); box-shadow: 0 1px 0 var(--edge), 0 4px 8px rgba(94, 70, 170, .18); }
+  .pool .tile.fade { opacity: 0; transform: scale(.6) rotate(12deg); pointer-events: none; }
+
+  .actions { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; pointer-events: none; }
+  .actions > * { pointer-events: auto; }
+  .nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 6px; }
+
+  /* Next level: sunny 3D pill */
+  .next-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    min-height: 64px;
+    padding: 0 12px 0 22px;
+    border-radius: 999px;
+    background: var(--sun);
+    color: var(--sun-ink);
+    font-size: 1.2rem; font-weight: 800;
+    box-shadow: 0 7px 0 var(--sun-edge), 0 16px 24px rgba(224, 160, 0, .4);
+    transition: transform .15s cubic-bezier(.3, 1.5, .5, 1), box-shadow .15s, opacity .2s;
+  }
+  .next-btn .arrow {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--sun-ink); color: var(--sun);
+    display: grid; place-items: center;
+    transition: transform .2s;
+  }
+  .next-btn .arrow svg { width: 20px; height: 20px; }
+  .next-btn:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 10px 0 var(--sun-edge), 0 20px 28px rgba(224, 160, 0, .45); }
+  .next-btn:hover .arrow { transform: translateX(-4px); }   /* RTL: forward is to the left */
+  .next-btn:active { transform: translateY(6px) scale(.98); box-shadow: 0 1px 0 var(--sun-edge), 0 4px 8px rgba(224, 160, 0, .4); }
+  .next-btn:focus-visible { outline-color: var(--sun-ink); }
+  /* Previous level: white 3D pill, same height */
+  .prev-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 64px;
+    padding: 0 12px 0 18px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--violet-edge);
+    font-size: 1rem; font-weight: 800;
+    box-shadow: 0 7px 0 #d9d0fb, 0 16px 22px rgba(94, 70, 170, .16);
+    transition: transform .15s cubic-bezier(.3, 1.5, .5, 1), box-shadow .15s, opacity .2s;
+  }
+  .prev-btn .arrow {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #ece6ff; color: var(--violet);
+    display: grid; place-items: center;
+    transition: transform .2s;
+  }
+  .prev-btn .arrow svg { width: 17px; height: 17px; }
+  .prev-btn:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 10px 0 #d9d0fb, 0 20px 26px rgba(94, 70, 170, .22); }
+  .prev-btn:hover .arrow { transform: translateX(4px); }    /* RTL: backward is to the right */
+  .prev-btn:active { transform: translateY(6px) scale(.98); box-shadow: 0 1px 0 #d9d0fb, 0 4px 8px rgba(94, 70, 170, .16); }
+  /* First level has no Previous, last level has no Next */
+  .prev-btn:disabled, .next-btn:disabled {
+    opacity: .4; cursor: default; pointer-events: none;
+    transform: translateY(5px); box-shadow: 0 2px 0 rgba(0, 0, 0, .12); filter: grayscale(.7);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.8); } to { opacity: 1; transform: none; } }
+
+  /* End of game */
+  .finale {
+    position: relative; overflow: hidden;
+    width: 100%;
+    padding: 24px 20px 22px;
+    border-radius: 32px;
+    background: var(--glass);
+    border: 1.5px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
+    box-shadow: var(--glass-shadow);
+    text-align: center;
+    display: grid; justify-items: center; gap: 6px;
+    animation: rise .6s cubic-bezier(.2, 1.3, .4, 1) both;
+  }
+  .finale::before {                         /* twinkling confetti */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(circle 5px at 10% 22%, #ff6fa5 98%, transparent),
+      radial-gradient(circle 4px at 24% 70%, #ffc83d 98%, transparent),
+      radial-gradient(circle 6px at 38% 12%, #4a9dff 98%, transparent),
+      radial-gradient(circle 4px at 62% 18%, #2fcf9d 98%, transparent),
+      radial-gradient(circle 5px at 78% 74%, #7b5cff 98%, transparent),
+      radial-gradient(circle 4px at 90% 26%, #ffc83d 98%, transparent),
+      radial-gradient(circle 5px at 52% 84%, #ff6fa5 98%, transparent);
+    animation: twinkle 1.6s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { from { opacity: .35; transform: translateY(0); } to { opacity: 1; transform: translateY(-6px); } }
+  .finale .star {
+    position: relative;
+    width: 62px; height: 62px; border-radius: 50%;
+    background: var(--sun); color: var(--sun-ink);
+    display: grid; place-items: center;
+    margin-bottom: 4px;
+    box-shadow: 0 5px 0 var(--sun-edge), 0 0 26px rgba(255, 200, 61, .85);
+    animation: starPulse 1.4s ease-in-out infinite;
+  }
+  .finale .star svg { width: 34px; height: 34px; }
+  @keyframes starPulse { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.12) rotate(8deg); } }
+  .finale h2 {
+    margin: 0; font-family: var(--display); font-weight: 400; font-size: 2.3rem; line-height: 1.4;
+    background: linear-gradient(100deg, #ff5f9a, #7b5cff 60%, #2aa8ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  }
+  .finale p { margin: 0 0 10px; font-size: 1.1rem; font-weight: 700; line-height: 1.7; }
+  .again {
+    padding: 10px 26px; border-radius: 999px;
+    background: var(--violet); color: #fff;
+    font-weight: 800; font-size: 1rem;
+    box-shadow: 0 5px 0 var(--violet-edge), 0 10px 16px rgba(90, 63, 214, .3);
+    transition: transform .15s cubic-bezier(.3, 1.5, .5, 1), box-shadow .15s;
+  }
+  .again:hover { transform: translateY(-2px) scale(1.06); }
+  .again:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--violet-edge); }
+
+  /* English meaning caption under the picture (mode 3) */
+  .meaning {
+    margin-top: -6px;
+    padding: 6px 26px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 5px 0 #d9d0fb, 0 10px 16px rgba(94, 70, 170, .16);
+    font-size: 1.3rem; font-weight: 800; letter-spacing: .02em;
+    color: var(--violet-edge);
+    font-family: system-ui, "Segoe UI", Roboto, "Vazirmatn", sans-serif;
+  }
+
+  /* ---------- Multiple-choice answers (modes 2 and 3) ---------- */
+  .choices { width: 100%; display: none; flex-direction: column; gap: 14px; }
+  #game-area[data-mode="2"] .choices, #game-area[data-mode="3"] .choices { display: flex; }
+  #game-area:not([data-mode="1"]) .board, #game-area:not([data-mode="1"]) .pool { display: none; }
+  #game-area:not([data-mode="1"]) { gap: 14px; }
+  #game-area:not([data-mode="1"]) .picture img { max-height: 24dvh; }
+  #game-area:not([data-mode="1"]) .picture.missing { max-height: 24dvh; }
+
+  .choice {
+    width: 100%; min-height: 66px;
+    border-radius: 24px;
+    background: var(--soft, #fff);
+    color: var(--ink);
+    box-shadow: 0 6px 0 var(--edge, #ccc), 0 14px 18px rgba(94, 70, 170, .16);
+    font-family: var(--display); font-size: 2.1rem; font-weight: 400; line-height: 1.5;
+    letter-spacing: 0;
+    transition: transform .15s cubic-bezier(.3, 1.6, .5, 1), box-shadow .15s, background .3s, color .3s, opacity .4s;
+  }
+  .choice:nth-child(1) { --soft: var(--c0-soft); --edge: var(--c0-edge); }
+  .choice:nth-child(2) { --soft: var(--c3-soft); --edge: var(--c3-edge); }
+  .choice:nth-child(3) { --soft: var(--c1-soft); --edge: var(--c1-edge); }
+  .choice:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 9px 0 var(--edge), 0 20px 24px rgba(94, 70, 170, .22); }
+  .choice:active { transform: translateY(5px) scale(.98); box-shadow: 0 1px 0 var(--edge), 0 4px 8px rgba(94, 70, 170, .16); }
+  .choice.wrong {
+    background: var(--bad); color: #fff;
+    box-shadow: 0 6px 0 var(--bad-edge), 0 0 26px rgba(242, 71, 93, .8);
+    animation: shake .5s 2;
+  }
+  .choice.right {
+    background: var(--ok); color: #fff;
+    text-shadow: 0 2px 0 rgba(0, 70, 50, .3);
+    box-shadow: 0 6px 0 var(--ok-edge), 0 0 0 4px rgba(19, 173, 127, .35), 0 0 30px rgba(19, 173, 127, .85);
+    animation: cheer .6s cubic-bezier(.3, 1.5, .5, 1);
+  }
+  .choice.dim { opacity: .35; pointer-events: none; transform: scale(.97); }
+
+  /* New level entrance */
+  #game-area.enter > .picture, #game-area.enter > .meaning, #game-area.enter > .audio-btn, #game-area.enter > .board, #game-area.enter > .choices, #game-area.enter > .bottom {
+    animation: enter .5s cubic-bezier(.3, 1.4, .5, 1) both;
+  }
+  #game-area.enter > .audio-btn { animation-delay: .05s; }
+  #game-area.enter > .board, #game-area.enter > .choices { animation-delay: .1s; }
+  #game-area.enter > .bottom { animation-delay: .15s; }
+  @keyframes enter { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-delay: 0s !important; }
+  }
+</style>
+</head>
+<body>
+<main id="main">
+  <div id="main-menu">
+    <h1 class="menu-title">الفبای فارسی</h1>
+    <p class="menu-sub">یک بازی را انتخاب کن</p>
+
+    <button class="menu-card" type="button" data-mode="1">
+      <span class="menu-icon" aria-hidden="true">آ</span>
+      <span class="menu-text"><strong>ساخت کلمه</strong><span>حروف را به ترتیب بچین و کلمه را بساز</span></span>
+      <svg class="menu-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+
+    <button class="menu-card" type="button" data-mode="2">
+      <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></span>
+      <span class="menu-text"><strong>املای درست</strong><span>تصویر را ببین، صدا را بشنو و املای درست را پیدا کن</span></span>
+      <svg class="menu-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+
+    <button class="menu-card" type="button" data-mode="3">
+      <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/></svg></span>
+      <span class="menu-text"><strong>تصویر و معنی</strong><span>با تصویر و معنی انگلیسی، کلمه فارسی را انتخاب کن</span></span>
+      <svg class="menu-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+  </div>
+
+  <div id="game-area" data-mode="1" hidden>
+    <button class="back-btn" id="backBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      <span>بازگشت به منوی اصلی</span>
+    </button>
+
+    <div class="progress">
+      <span class="level-label" id="levelLabel"></span>
+      <div class="track" id="track" role="progressbar" aria-label="پیشرفت بازی" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="fill" id="fill"></div>
+      </div>
+    </div>
+
+    <div class="picture" id="picture">
+      <img id="img" alt="" draggable="false">
+      <div class="placeholder" aria-hidden="true">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/></svg>
+        <span>تصویر کلمه</span>
+      </div>
+    </div>
+
+    <div class="meaning" id="meaning" dir="ltr" hidden></div>
+
+    <button class="audio-btn" id="audioBtn" type="button" aria-label="شنیدن تلفظ کلمه">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 5 6 9H3v6h3l5 4V5z" fill="currentColor"/>
+        <path class="wave w1" d="M15.5 9a4 4 0 0 1 0 6"/>
+        <path class="wave w2" d="M18.5 6.5a8 8 0 0 1 0 11"/>
+      </svg>
+      <span>شنیدن کلمه</span>
+    </button>
+
+    <div class="board" id="board">
+      <div class="slots" id="slots" aria-label="جای حروف کلمه"></div>
+      <div class="word" id="word" aria-hidden="true"></div>
+    </div>
+
+    <div class="status" id="statusRow"><span id="status" role="status" aria-live="polite"></span></div>
+
+    <div class="choices" id="choices" aria-label="گزینه‌ها"></div>
+
+    <div class="bottom">
+      <div class="pool" id="pool" aria-label="حروف"></div>
+      <div class="actions">
+        <div class="finale" id="finale" hidden>
+          <div class="star" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2.8 2.7 5.8 6.3.8-4.6 4.4 1.2 6.3L12 17l-5.6 3.1 1.2-6.3L3 9.4l6.3-.8z"/></svg>
+          </div>
+          <h2>آفرین!</h2>
+          <p>شما تمام کلمات را یاد گرفتید</p>
+          <button class="again" id="again" type="button">بازی دوباره</button>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav" aria-label="پیمایش مراحل">
+      <button class="prev-btn" id="prevBtn" type="button">
+        <span class="arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+        <span>مرحله قبل</span>
+      </button>
+      <button class="next-btn" id="nextBtn" type="button">
+        <span>مرحله بعد</span>
+        <span class="arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+        </span>
+      </button>
+    </nav>
+  </div>
+</main>
+
+<script>
+  /* ====== Level database (from the spreadsheet: word, letters, image, audio, meaning) ====== */
+  const levels = [
+    { word: 'آب', letters: ['آ', 'ب'], image: 'images/ab.png', audio: 'sounds/ab.m4a', meaning: 'Water' },
+    { word: 'بابا', letters: ['ب', 'ا', 'ب', 'ا'], image: 'images/baba.png', audio: 'sounds/baba.m4a', meaning: 'Dad' },
+    { word: 'پا', letters: ['پ', 'ا'], image: 'images/pa.png', audio: 'sounds/pa.m4a', meaning: 'Foot' },
+    { word: 'توپ', letters: ['ت', 'و', 'پ'], image: 'images/tup.png', audio: 'sounds/tup.m4a', meaning: 'Ball' },
+    { word: 'تاب', letters: ['ت', 'ا', 'ب'], image: 'images/tab.png', audio: 'sounds/tab.m4a', meaning: 'Swing' },
+    { word: 'توت', letters: ['ت', 'و', 'ت'], image: 'images/tut.png', audio: 'sounds/tut.m4a', meaning: 'Mulberry' },
+    { word: 'باد', letters: ['ب', 'ا', 'د'], image: 'images/bad_word.png', audio: 'sounds/bad_word.m4a', meaning: 'Wind' },
+    { word: 'پتو', letters: ['پ', 'ت', 'و'], image: 'images/patu.png', audio: 'sounds/patu.m4a', meaning: 'Blanket' },
+    { word: 'دود', letters: ['د', 'و', 'د'], image: 'images/dud.png', audio: 'sounds/dud.m4a', meaning: 'Smoke' },
+    { word: 'بید', letters: ['ب', 'ی', 'د'], image: 'images/bid.png', audio: 'sounds/bid.m4a', meaning: 'Willow' },
+    { word: 'داد', letters: ['د', 'ا', 'د'], image: 'images/dad.png', audio: 'sounds/dad.m4a', meaning: 'Shout' },
+    { word: 'بد', letters: ['ب', 'د'], image: 'images/bad.png', audio: 'sounds/bad.m4a', meaning: 'Bad' },
+    { word: 'در', letters: ['د', 'ر'], image: 'images/dar.png', audio: 'sounds/dar.m4a', meaning: 'Door' },
+    { word: 'زرد', letters: ['ز', 'ر', 'د'], image: 'images/zard.png', audio: 'sounds/zard.m4a', meaning: 'Yellow' },
+    { word: 'بار', letters: ['ب', 'ا', 'ر'], image: 'images/bar.png', audio: 'sounds/bar.m4a', meaning: 'Cargo' },
+    { word: 'رژ', letters: ['ر', 'ژ'], image: 'images/rozh.png', audio: 'sounds/rozh.m4a', meaning: 'Lipstick' },
+    { word: 'بز', letters: ['ب', 'ز'], image: 'images/boz.png', audio: 'sounds/boz.m4a', meaning: 'Goat' },
+    { word: 'رود', letters: ['ر', 'و', 'د'], image: 'images/rud.png', audio: 'sounds/rud.m4a', meaning: 'River' },
+    { word: 'روز', letters: ['ر', 'و', 'ز'], image: 'images/ruz.png', audio: 'sounds/ruz.m4a', meaning: 'Day' },
+    { word: 'دیوار', letters: ['د', 'ی', 'و', 'ا', 'ر'], image: 'images/divar.png', audio: 'sounds/divar.m4a', meaning: 'Wall' },
+    { word: 'داور', letters: ['د', 'ا', 'و', 'ر'], image: 'images/davar.png', audio: 'sounds/davar.m4a', meaning: 'Referee' },
+    { word: 'ویزا', letters: ['و', 'ی', 'ز', 'ا'], image: 'images/viza.png', audio: 'sounds/viza.m4a', meaning: 'Visa' },
+    { word: 'ورود', letters: ['و', 'ر', 'و', 'د'], image: 'images/vorud.png', audio: 'sounds/vorud.m4a', meaning: 'Entrance' },
+    { word: 'آواز', letters: ['آ', 'و', 'ا', 'ز'], image: 'images/avaz.png', audio: 'sounds/avaz.m4a', meaning: 'Singing' },
+    { word: 'مادر', letters: ['م', 'ا', 'د', 'ر'], image: 'images/madar.png', audio: 'sounds/madar.m4a', meaning: 'Mother' },
+    { word: 'مو', letters: ['م', 'و'], image: 'images/mu.png', audio: 'sounds/mu.m4a', meaning: 'Hair' },
+    { word: 'میز', letters: ['م', 'ی', 'ز'], image: 'images/miz.png', audio: 'sounds/miz.m4a', meaning: 'Table' },
+    { word: 'مار', letters: ['م', 'ا', 'ر'], image: 'images/mar.png', audio: 'sounds/mar.m4a', meaning: 'Snake' },
+    { word: 'متر', letters: ['م', 'ت', 'ر'], image: 'images/metr.png', audio: 'sounds/metr.m4a', meaning: 'Tape measure' },
+    { word: 'بام', letters: ['ب', 'ا', 'م'], image: 'images/bam.png', audio: 'sounds/bam.m4a', meaning: 'Roof' },
+    { word: 'بیمار', letters: ['ب', 'ی', 'م', 'ا', 'ر'], image: 'images/bimar.png', audio: 'sounds/bimar.m4a', meaning: 'Sick' }
+  ];
+
+  /* ====== Auto-distractors: visually similar letters ====== */
+  const SIMILAR = {
+    'ب': ['پ', 'ت', 'ن', 'ث'],
+    'پ': ['ب', 'ت', 'ث', 'ن'],
+    'ت': ['ب', 'پ', 'ث', 'ن'],
+    'د': ['ذ', 'ر'],
+    'ر': ['ز', 'ژ', 'و'],
+    'ز': ['ر', 'ژ', 'ذ'],
+    'ژ': ['ز', 'ر'],
+    'و': ['ر', 'م'],
+    'ا': ['آ', 'ل'],
+    'آ': ['ا', 'ل'],
+    'ی': ['ن', 'ب', 'ت'],
+    'م': ['و', 'ن', 'ف']
+  };
+  const FALLBACK = ['ن', 'ب', 'ت', 'پ', 'ز', 'ر', 'ذ', 'د', 'ژ', 'ف'];
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Returns `count` look-alike letters that are NOT part of the word. Candidates are drawn
+  // round-robin from the word's letters so the decoys resemble different letters of the word.
+  function makeDistractors(letters, count = 2) {
+    const taken = new Set(letters);
+    const picked = [];
+    const queues = shuffle([...taken]).map(ch => shuffle(SIMILAR[ch] || []));
+    while (picked.length < count && queues.some(q => q.length)) {
+      for (const q of queues) {
+        while (q.length) {
+          const c = q.shift();
+          if (!taken.has(c)) { taken.add(c); picked.push(c); break; }
+        }
+        if (picked.length === count) break;
+      }
+    }
+    for (const c of shuffle(FALLBACK)) {            // safety net, in case a word has too few look-alikes
+      if (picked.length >= count) break;
+      if (!taken.has(c)) { taken.add(c); picked.push(c); }
+    }
+    return picked;
+  }
+
+  levels.forEach(lv => {
+    lv.distractors = makeDistractors(lv.letters);
+    if (lv.letters.join('') !== lv.word) console.warn('Letters do not spell the word:', lv.word, lv.letters);
+  });
+
+  /* ====== Spelling similarity (mode 2 distractors) ====== */
+  const areLookAlikes = (a, b) => (SIMILAR[a] || []).includes(b) || (SIMILAR[b] || []).includes(a);
+
+  // Higher score = more similar spelling to `target`:
+  //  +2 per shared letter (counting repeats), +1 per letter in the same position,
+  //  start/end letter: +2 if identical, +1 if look-alikes, -0.5 per letter of length difference.
+  function spellingScore(target, other) {
+    const A = Array.from(target), B = Array.from(other);
+    const left = B.slice();
+    let common = 0;
+    A.forEach(ch => { const k = left.indexOf(ch); if (k > -1) { common++; left.splice(k, 1); } });
+    const samePos = A.reduce((n, ch, i) => n + (B[i] === ch ? 1 : 0), 0);
+    const edge = (x, y) => x === y ? 2 : (areLookAlikes(x, y) ? 1 : 0);
+    const ends = edge(A[0], B[0]) + edge(A[A.length - 1], B[B.length - 1]);
+    return common * 2 + samePos + ends - 0.5 * Math.abs(A.length - B.length);
+  }
+
+  // The `count` other words from `levels` that are spelled most like `lv` (ties broken randomly).
+  function similarWords(lv, count = 2) {
+    return levels
+      .filter(l => l.word !== lv.word)
+      .map(l => ({ l, s: spellingScore(lv.word, l.word) + Math.random() * 0.01 }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, count)
+      .map(x => x.l);
+  }
+
+  /* ====== Elements ====== */
+  const $ = id => document.getElementById(id);
+  const mainMenu = $('main-menu'), gameEl = $('game-area'), pictureEl = $('picture'), imgEl = $('img'), audioBtn = $('audioBtn');
+  const boardEl = $('board'), slotsEl = $('slots'), wordEl = $('word');
+  const statusEl = $('status'), poolEl = $('pool'), choicesEl = $('choices'), meaningEl = $('meaning');
+  const levelLabel = $('levelLabel'), trackEl = $('track'), fillEl = $('fill');
+  const prevBtn = $('prevBtn'), nextBtn = $('nextBtn'), finaleEl = $('finale'), againBtn = $('again');
+
+  /* ====== State ====== */
+  let levelIndex = 0;
+  let level = levels[0];
+  let slotCount = 0;
+  let tiles = [];        // [{ id, ch }]  every letter button, correct or distractor
+  let poolOrder = [];    // tile ids in their shuffled order
+  let slots = [];        // slots[i] = tile id or null (index 0 = right-most square)
+  let locked = false;    // true while checking / after solving
+  let timers = [];
+  let mode = 1;          // 1 = build the word, 2 = correct spelling, 3 = word & image match
+  let choices = [];      // modes 2/3: [{ word, correct }]
+  const HINT = {
+    1: 'حروف را به ترتیب بچین',
+    2: 'املای درست کلمه را انتخاب کن',
+    3: 'کلمه فارسی را انتخاب کن'
+  };
+
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+  const fa = n => n.toLocaleString('fa-IR');
+
+  function say(text, kind) {
+    statusEl.textContent = text || '';
+    $('statusRow').className = 'status ' + (kind || '');
+  }
+
+  function setProgress(done) {
+    const pct = Math.round(done / levels.length * 100);
+    fillEl.style.width = pct + '%';
+    trackEl.setAttribute('aria-valuenow', pct);
+  }
+
+  /* ====== Loading a level ====== */
+  function loadLevel(i) {
+    clearTimers();
+    levelIndex = i;
+    level = levels[i];
+    slotCount = Array.from(level.word).length;
+
+    tiles = [...level.letters, ...level.distractors].map((ch, id) => ({ id, ch }));
+    poolOrder = shuffle(tiles.map(t => t.id));
+    slots = Array(slotCount).fill(null);
+    locked = false;
+
+    boardEl.className = 'board';
+    wordEl.textContent = level.word;
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === levels.length - 1;
+    finaleEl.hidden = true;
+    gameEl.dataset.mode = mode;
+    meaningEl.hidden = mode !== 3;
+    meaningEl.textContent = level.meaning;
+    audioBtn.hidden = mode === 3;           // mode 3 is silent: no audio button, nothing is loaded
+    if (mode !== 1) buildChoices();
+    say(HINT[mode], '');
+    levelLabel.textContent = 'مرحله ' + fa(i + 1) + ' از ' + fa(levels.length);
+    setProgress(i);
+
+    // picture
+    pictureEl.classList.remove('missing');
+    imgEl.alt = 'تصویر کلمه ' + level.word;
+    imgEl.src = level.image;
+
+    // audio
+    stopAudio();
+    if (mode !== 3) audio.src = level.audio;
+
+    render();
+    renderChoices();
+
+    // entrance animation
+    gameEl.classList.remove('enter');
+    void gameEl.offsetWidth;
+    gameEl.classList.add('enter');
+    later(() => gameEl.classList.remove('enter'), 800);
+  }
+
+  /* ====== Multiple choice (modes 2 and 3): exactly 3 options ====== */
+  function buildChoices() {
+    const others = mode === 2
+      ? similarWords(level, 2)                                         // look-alike spellings
+      : shuffle(levels.filter(l => l.word !== level.word)).slice(0, 2); // mode 3: any two other words
+    choices = shuffle([level, ...others]).map(l => ({ word: l.word, correct: l === level }));
+  }
+
+  function renderChoices() {
+    choicesEl.replaceChildren();
+    if (mode === 1) return;
+    choices.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'choice';
+      b.dataset.i = i;
+      b.textContent = c.word;
+      choicesEl.appendChild(b);
+    });
+  }
+
+  choicesEl.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-i]');
+    if (!btn || locked) return;
+    locked = true;
+    if (choices[Number(btn.dataset.i)].correct) {
+      btn.classList.add('right');
+      choicesEl.querySelectorAll('.choice:not(.right)').forEach(b => b.classList.add('dim'));
+      say('آفرین! درست بود', 'ok');
+      setProgress(levelIndex + 1);
+      if (levelIndex === levels.length - 1) later(() => { finaleEl.hidden = false; }, 700);
+    } else {
+      btn.classList.add('wrong');             // red + shake (1s), then try again
+      say('دوباره امتحان کن', 'bad');
+      later(() => { btn.classList.remove('wrong'); say(HINT[mode], ''); locked = false; }, 1000);
+    }
+  });
+
+  /* ====== Views: main menu <-> game area ====== */
+  function stopAudio() {
+    audio.pause();
+    audio.removeAttribute('src');   // forget the file so nothing can resume or autoplay
+    audio.load();
+    audioBtn.classList.remove('playing');
+  }
+
+  function startMode(m) {
+    mode = m;
+    mainMenu.hidden = true;
+    gameEl.hidden = false;
+    loadLevel(0);
+    window.scrollTo(0, 0);
+  }
+
+  function backToMenu() {
+    clearTimers();
+    stopAudio();
+    locked = false;
+    gameEl.hidden = true;
+    mainMenu.hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  document.querySelectorAll('.menu-card').forEach(card =>
+    card.addEventListener('click', () => startMode(Number(card.dataset.mode))));
+  $('backBtn').addEventListener('click', backToMenu);
+
+  function makeTile(t) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tile';
+    b.dataset.id = t.id;
+    b.textContent = t.ch;
+    return b;
+  }
+
+  function render(popIndex) {
+    document.documentElement.style.setProperty('--n', slotCount);
+
+    // Squares
+    slotsEl.replaceChildren();
+    slots.forEach((id, i) => {
+      const s = document.createElement('div');
+      s.className = 'slot';
+      if (id !== null) {
+        s.classList.add('filled');
+        if (i !== popIndex) s.classList.add('static');
+        const b = makeTile(tiles[id]);
+        b.setAttribute('aria-label', 'برداشتن حرف ' + tiles[id].ch);
+        s.appendChild(b);
+      }
+      slotsEl.appendChild(s);
+    });
+
+    // Pool: every tile that is not currently in a square, in its shuffled order
+    poolEl.replaceChildren();
+    poolOrder.filter(id => !slots.includes(id)).forEach(id => {
+      poolEl.appendChild(makeTile(tiles[id]));
+    });
+  }
+
+  /* ====== Interaction ====== */
+  poolEl.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-id]');
+    if (!btn || locked) return;
+    const idx = slots.indexOf(null);          // first free square (right-most first)
+    if (idx === -1) return;
+    slots[idx] = Number(btn.dataset.id);
+    render(idx);
+    if (!slots.includes(null)) checkAnswer();
+  });
+
+  slotsEl.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-id]');
+    if (!btn || locked) return;
+    const i = slots.indexOf(Number(btn.dataset.id));
+    if (i === -1) return;
+    slots[i] = null;                          // undo: back to the pool
+    render();
+  });
+
+  // Free navigation: works whether or not the current word was solved
+  nextBtn.addEventListener('click', () => { if (levelIndex < levels.length - 1) loadLevel(levelIndex + 1); });
+  prevBtn.addEventListener('click', () => { if (levelIndex > 0) loadLevel(levelIndex - 1); });
+  againBtn.addEventListener('click', () => loadLevel(0));
+
+  /* ====== Checking ====== */
+  function checkAnswer() {
+    locked = true;
+    const attempt = slots.map(id => tiles[id].ch).join('');
+    attempt === level.word ? onCorrect() : onWrong();
+  }
+
+  function onWrong() {
+    boardEl.classList.add('wrong');           // red + shake (2 x 0.5s = 1s)
+    say('دوباره امتحان کن', 'bad');
+    later(() => {
+      boardEl.classList.remove('wrong');
+      slots = Array(slotCount).fill(null);    // every letter returns to the pool
+      render();
+      say(HINT[mode], '');
+      locked = false;
+    }, 1000);
+  }
+
+  function onCorrect() {
+    boardEl.classList.add('ok');              // squares turn green
+    say('آفرین! درست نوشتی', 'ok');
+    setProgress(levelIndex + 1);
+    // distractors still in the pool fade away
+    poolEl.querySelectorAll('.tile').forEach(t => t.classList.add('fade'));
+    // then the separate squares fuse and the joined word appears
+    later(() => boardEl.classList.add('merged'), 650);
+    // after the last word, show the finale card
+    later(() => {
+      const last = levelIndex === levels.length - 1;
+      finaleEl.hidden = !last;
+      (last ? againBtn : nextBtn).focus({ preventScroll: true });
+    }, 1300);
+  }
+
+  /* ====== Picture & audio ====== */
+  imgEl.addEventListener('error', () => pictureEl.classList.add('missing'));
+
+  const audio = new Audio();
+  audio.preload = 'auto';
+  const stopAnim = () => audioBtn.classList.remove('playing');
+  audio.addEventListener('playing', () => audioBtn.classList.add('playing'));
+  ['ended', 'pause', 'error'].forEach(ev => audio.addEventListener(ev, stopAnim));
+
+  audioBtn.addEventListener('click', () => {
+    if (mode === 3 || !audio.getAttribute('src')) return;
+    try { audio.currentTime = 0; } catch (_) {}
+    const p = audio.play();
+    if (p && p.catch) p.catch(() => {
+      stopAnim();
+      if (!locked) say('فایل صوتی پیدا نشد', 'bad');
+    });
+  });
+
+  // The app starts on the main menu; a level loads only when a mode is chosen.
+</script>
+</body>
+</html>
